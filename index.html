@@ -3,9 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Editor bez toolbaru</title>
+<title>Coding Tutorial - FrCreator</title>
 <style>
   body { font-family: Arial, sans-serif; margin:0; padding:0; display:flex; flex-direction:column; height:100vh; background:#000; color:#fff; }
+  .toolbar { background:#000; padding:10px; display:none; gap:5px; flex-wrap:wrap; color:#fff; }
+  .toolbar button, .toolbar select { padding:5px; background:#000; color:#fff; border:2px solid #fff; border-radius:25px; }
   #editor { flex:1; padding:20px; border:none; outline:none; overflow-y:auto; background:#111; font-family:Arial, sans-serif; white-space:pre-wrap; color:#fff; }
   .code-block { background:#1e1e1e; color:#d4d4d4; font-family:'Courier New', monospace; padding:10px; display:flex; gap:10px; }
   .line-numbers { text-align:right; user-select:none; color:#888; }
@@ -19,6 +21,38 @@
 </head>
 <body>
 
+<div class="toolbar" id="toolbar">
+  <button onclick="format('bold')"><b>B</b></button>
+  <button onclick="format('underline')"><u>U</u></button>
+  <select onchange="format('fontName', this.value)">
+    <option value="">Font</option>
+    <option value="Arial">Klasický</option>
+    <option value="Courier New">Linux Terminal</option>
+    <option value="monospace">Monospace</option>
+  </select>
+  <select onchange="format('fontSize', this.value)">
+    <option value="">Velikost textu</option>
+    <option value="1">10px</option>
+    <option value="2">13px</option>
+    <option value="3">16px</option>
+    <option value="4">18px</option>
+    <option value="5">24px</option>
+    <option value="6">32px</option>
+    <option value="7">48px</option>
+  </select>
+  <select onchange="format('foreColor', this.value)">
+    <option value="">Barva textu</option>
+    <option value="red">Červená</option>
+    <option value="blue">Modrá</option>
+    <option value="green">Zelená</option>
+    <option value="black">Černá</option>
+  </select>
+  <button onclick="format('insertUnorderedList')">• List</button>
+  <button onclick="format('insertOrderedList')">1. List</button>
+  <button onclick="insertCode()">Vložit kód</button>
+  <button onclick="insertDocButton()">Vložit tlačítko editoru</button>
+</div>
+
 <div id="editor" contenteditable="false"></div>
 
 <div class="modal" id="modal">
@@ -29,27 +63,61 @@
   <div class="modal-body" id="modal-editor"></div>
 </div>
 
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDGmaBUXKgFq1mPuSIi4_DY6xUycwNGnKE",
+  authDomain: "textovy-dokument.firebaseapp.com",
+  databaseURL: "https://textovy-dokument-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "textovy-dokument",
+  storageBucket: "textovy-dokument.firebasestorage.app",
+  messagingSenderId: "207844729713",
+  appId: "1:207844729713:web:464c37fbde39a43aec0cd0",
+  measurementId: "G-XS4PLS2G01"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
 const editor = document.getElementById('editor');
+const toolbar = document.getElementById('toolbar');
 const modal = document.getElementById('modal');
 const modalEditor = document.getElementById('modal-editor');
 const modalTitle = document.getElementById('modal-title');
 
 let currentDocId = null;
 
-// Načtení uloženého textu při načtení stránky
-window.onload = () => {
-  const saved = localStorage.getItem('mainContent');
-  if(saved) editor.innerHTML = saved;
-};
+// --- načtení hlavního obsahu z Firebase ---
+db.ref('mainContent').on('value', snapshot => {
+  if(!editor.isContentEditable){
+    editor.innerHTML = snapshot.val() || "<p>Vítej v editoru! Stiskni Ctrl+E pro editaci.</p>";
+  }
+});
 
-// Automatické ukládání
+// --- načtení dokumentů z Firebase ---
+function loadDocument(id) {
+  db.ref('documents/' + id).on('value', snapshot => {
+    if(currentDocId === id && !editor.isContentEditable) {
+      modalEditor.innerHTML = snapshot.val() || "";
+    }
+  });
+}
+
+// Formátování
+function format(command, value = null) {
+  if(!editor.isContentEditable) return;
+  document.execCommand(command, false, value);
+  saveText();
+}
+
+// Ukládání hlavního editoru
 editor.addEventListener('input', () => {
   if(editor.isContentEditable) saveText();
 });
 editor.addEventListener('keydown', handleKeys);
 
-// Enter a Tab
 function handleKeys(e) {
   if(!editor.isContentEditable) return;
   if(e.key === 'Enter') {
@@ -64,17 +132,15 @@ function handleKeys(e) {
   }
 }
 
-// Uložení
 function saveText() {
-  localStorage.setItem('mainContent', editor.innerHTML);
+  db.ref('mainContent').set(editor.innerHTML);
 }
 
 // Tajný edit mode
 window.editmode = () => {
   editor.setAttribute('contenteditable', 'true');
+  toolbar.style.display = 'flex';
 };
-
-// Klávesová zkratka Ctrl+E na zapnutí edit mode
 document.addEventListener('keydown', (e) => {
   if(e.ctrlKey && e.key.toLowerCase() === 'e') {
     e.preventDefault();
@@ -99,8 +165,8 @@ function insertCode() {
   `;
   target.innerHTML += codeHTML;
 
-  if (target === editor) saveText();
-  else if (currentDocId) localStorage.setItem(currentDocId, modalEditor.innerHTML);
+  if(target === editor) saveText();
+  else if(currentDocId) db.ref('documents/' + currentDocId).set(modalEditor.innerHTML);
 }
 
 // Vložení tlačítka pro dokument
@@ -112,6 +178,8 @@ function insertDocButton() {
   const btn = `<button class="doc-btn" onclick="openModalEditor('${id}', '${name}')">${name}</button>`;
   editor.innerHTML += btn;
   saveText();
+  // automaticky vytvořit záznam v Firebase
+  db.ref('documents/' + id).set("");
 }
 
 // Otevření modálního editoru
@@ -120,17 +188,18 @@ function openModalEditor(id, name) {
   modal.style.display = 'flex';
   modalTitle.textContent = name;
 
-  const saved = localStorage.getItem(id);
-  modalEditor.innerHTML = saved ? saved : "";
-
   modalEditor.contentEditable = editor.isContentEditable ? "true" : "false";
+
+  db.ref('documents/' + id).get().then(snapshot => {
+    modalEditor.innerHTML = snapshot.exists() ? snapshot.val() : "";
+  });
+
+  // live update
+  loadDocument(id);
 
   modalEditor.oninput = () => {
     if(currentDocId && editor.isContentEditable) {
-      localStorage.setItem(currentDocId, modalEditor.innerHTML);
-    } else {
-      const saved = localStorage.getItem(currentDocId);
-      modalEditor.innerHTML = saved ? saved : "";
+      db.ref('documents/' + currentDocId).set(modalEditor.innerHTML);
     }
   };
 
@@ -150,16 +219,14 @@ function openModalEditor(id, name) {
   };
 }
 
-// Zavření modálního okna
 function closeModal() {
   if(currentDocId && editor.isContentEditable) {
-    localStorage.setItem(currentDocId, modalEditor.innerHTML);
+    db.ref('documents/' + currentDocId).set(modalEditor.innerHTML);
     saveText();
   }
   modal.style.display = 'none';
   currentDocId = null;
 }
 </script>
-
 </body>
 </html>

@@ -63,7 +63,24 @@
   <div class="modal-body" id="modal-editor"></div>
 </div>
 
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDGmaBUXKgFq1mPuSIi4_DY6xUycwNGnKE",
+  authDomain: "textovy-dokument.firebaseapp.com",
+  databaseURL: "https://textovy-dokument-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "textovy-dokument",
+  storageBucket: "textovy-dokument.firebasestorage.app",
+  messagingSenderId: "207844729713",
+  appId: "1:207844729713:web:464c37fbde39a43aec0cd0",
+  measurementId: "G-XS4PLS2G01"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
 const editor = document.getElementById('editor');
 const toolbar = document.getElementById('toolbar');
 const modal = document.getElementById('modal');
@@ -72,11 +89,21 @@ const modalTitle = document.getElementById('modal-title');
 
 let currentDocId = null;
 
-// Načtení uloženého textu při načtení stránky
-window.onload = () => {
-  const saved = localStorage.getItem('mainContent');
-  if(saved) editor.innerHTML = saved;
-};
+// --- načtení hlavního obsahu z Firebase ---
+db.ref('mainContent').on('value', snapshot => {
+  if(!editor.isContentEditable){
+    editor.innerHTML = snapshot.val() || "<p>Vítej v editoru! Stiskni Ctrl+E pro editaci.</p>";
+  }
+});
+
+// --- načtení dokumentů z Firebase ---
+function loadDocument(id) {
+  db.ref('documents/' + id).on('value', snapshot => {
+    if(currentDocId === id && !editor.isContentEditable) {
+      modalEditor.innerHTML = snapshot.val() || "";
+    }
+  });
+}
 
 // Formátování
 function format(command, value = null) {
@@ -85,13 +112,12 @@ function format(command, value = null) {
   saveText();
 }
 
-// Automatické ukládání
+// Ukládání hlavního editoru
 editor.addEventListener('input', () => {
   if(editor.isContentEditable) saveText();
 });
 editor.addEventListener('keydown', handleKeys);
 
-// Enter a Tab
 function handleKeys(e) {
   if(!editor.isContentEditable) return;
   if(e.key === 'Enter') {
@@ -106,9 +132,8 @@ function handleKeys(e) {
   }
 }
 
-// Uložení
 function saveText() {
-  localStorage.setItem('mainContent', editor.innerHTML);
+  db.ref('mainContent').set(editor.innerHTML);
 }
 
 // Tajný edit mode
@@ -116,8 +141,6 @@ window.editmode = () => {
   editor.setAttribute('contenteditable', 'true');
   toolbar.style.display = 'flex';
 };
-
-// Klávesová zkratka Ctrl+E na zapnutí edit mode
 document.addEventListener('keydown', (e) => {
   if(e.ctrlKey && e.key.toLowerCase() === 'e') {
     e.preventDefault();
@@ -142,8 +165,8 @@ function insertCode() {
   `;
   target.innerHTML += codeHTML;
 
-  if (target === editor) saveText();
-  else if (currentDocId) localStorage.setItem(currentDocId, modalEditor.innerHTML);
+  if(target === editor) saveText();
+  else if(currentDocId) db.ref('documents/' + currentDocId).set(modalEditor.innerHTML);
 }
 
 // Vložení tlačítka pro dokument
@@ -155,6 +178,8 @@ function insertDocButton() {
   const btn = `<button class="doc-btn" onclick="openModalEditor('${id}', '${name}')">${name}</button>`;
   editor.innerHTML += btn;
   saveText();
+  // automaticky vytvořit záznam v Firebase
+  db.ref('documents/' + id).set("");
 }
 
 // Otevření modálního editoru
@@ -163,20 +188,18 @@ function openModalEditor(id, name) {
   modal.style.display = 'flex';
   modalTitle.textContent = name;
 
-  // Načti obsah
-  const saved = localStorage.getItem(id);
-  modalEditor.innerHTML = saved ? saved : "";
-
-  // Blokovat editaci pokud hlavní editor není odemčen
   modalEditor.contentEditable = editor.isContentEditable ? "true" : "false";
+
+  db.ref('documents/' + id).get().then(snapshot => {
+    modalEditor.innerHTML = snapshot.exists() ? snapshot.val() : "";
+  });
+
+  // live update
+  loadDocument(id);
 
   modalEditor.oninput = () => {
     if(currentDocId && editor.isContentEditable) {
-      localStorage.setItem(currentDocId, modalEditor.innerHTML);
-    } else {
-      // Obnov obsah, aby uživatel nemohl nic psát
-      const saved = localStorage.getItem(currentDocId);
-      modalEditor.innerHTML = saved ? saved : "";
+      db.ref('documents/' + currentDocId).set(modalEditor.innerHTML);
     }
   };
 
@@ -196,16 +219,14 @@ function openModalEditor(id, name) {
   };
 }
 
-// Zavření modálního okna
 function closeModal() {
   if(currentDocId && editor.isContentEditable) {
-    localStorage.setItem(currentDocId, modalEditor.innerHTML);
-    saveText(); // uložit hlavní editor při zavření modálu
+    db.ref('documents/' + currentDocId).set(modalEditor.innerHTML);
+    saveText();
   }
   modal.style.display = 'none';
   currentDocId = null;
 }
 </script>
-
 </body>
 </html>

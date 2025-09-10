@@ -21,37 +21,7 @@
 </head>
 <body>
 
-<div class="toolbar" id="toolbar">
-  <button onclick="format('bold')"><b>B</b></button>
-  <button onclick="format('underline')"><u>U</u></button>
-  <select onchange="format('fontName', this.value)">
-    <option value="">Font</option>
-    <option value="Arial">Klasický</option>
-    <option value="Courier New">Linux Terminal</option>
-    <option value="monospace">Monospace</option>
-  </select>
-  <select onchange="format('fontSize', this.value)">
-    <option value="">Velikost textu</option>
-    <option value="1">10px</option>
-    <option value="2">13px</option>
-    <option value="3">16px</option>
-    <option value="4">18px</option>
-    <option value="5">24px</option>
-    <option value="6">32px</option>
-    <option value="7">48px</option>
-  </select>
-  <select onchange="format('foreColor', this.value)">
-    <option value="">Barva textu</option>
-    <option value="red">Červená</option>
-    <option value="blue">Modrá</option>
-    <option value="green">Zelená</option>
-    <option value="black">Černá</option>
-  </select>
-  <button onclick="format('insertUnorderedList')">• List</button>
-  <button onclick="format('insertOrderedList')">1. List</button>
-  <button onclick="insertCode()">Vložit kód</button>
-  <button onclick="insertDocButton()">Vložit tlačítko editoru</button>
-</div>
+
 
 <div id="editor" contenteditable="false"></div>
 
@@ -134,52 +104,6 @@ function handleKeys(e) {
 
 function saveText() {
   db.ref('mainContent').set(editor.innerHTML);
-}
-
-// Tajný edit mode
-window.editmode = () => {
-  editor.setAttribute('contenteditable', 'true');
-  toolbar.style.display = 'flex';
-};
-document.addEventListener('keydown', (e) => {
-  if(e.ctrlKey && e.key.toLowerCase() === 'e') {
-    e.preventDefault();
-    editmode();
-  }
-});
-
-// Vložení kódu
-function insertCode() {
-  const target = (modal.style.display === "flex") ? modalEditor : editor;
-  if(!target.isContentEditable) return;
-
-  const code = prompt("Vlož sem svůj kód:");
-  if(!code) return;
-  const lines = code.split('\n');
-  const lineNumbers = lines.map((_, i) => i + 1).join('<br>');
-  const codeHTML = `
-    <div class="code-block">
-      <div class="line-numbers">${lineNumbers}</div>
-      <div class="code-content">${lines.join('<br>')}</div>
-    </div><br>
-  `;
-  target.innerHTML += codeHTML;
-
-  if(target === editor) saveText();
-  else if(currentDocId) db.ref('documents/' + currentDocId).set(modalEditor.innerHTML);
-}
-
-// Vložení tlačítka pro dokument
-function insertDocButton() {
-  if(!editor.isContentEditable) return;
-  const name = prompt("Zadej název tlačítka:", "Nový dokument");
-  if (!name) return;
-  const id = "doc_" + Date.now();
-  const btn = `<button class="doc-btn" onclick="openModalEditor('${id}', '${name}')">${name}</button>`;
-  editor.innerHTML += btn;
-  saveText();
-  // automaticky vytvořit záznam v Firebase
-  db.ref('documents/' + id).set("");
 }
 
 // Otevření modálního editoru

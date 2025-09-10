@@ -3,11 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Editor s kódem a tlačítky pro dokumenty</title>
+<title>Editor bez toolbaru</title>
 <style>
   body { font-family: Arial, sans-serif; margin:0; padding:0; display:flex; flex-direction:column; height:100vh; background:#000; color:#fff; }
-  .toolbar { background:#000; padding:10px; display:none; gap:5px; flex-wrap:wrap; color:#fff; }
-  .toolbar button, .toolbar select { padding:5px; background:#000; color:#fff; border:2px solid #fff; border-radius:25px; }
   #editor { flex:1; padding:20px; border:none; outline:none; overflow-y:auto; background:#111; font-family:Arial, sans-serif; white-space:pre-wrap; color:#fff; }
   .code-block { background:#1e1e1e; color:#d4d4d4; font-family:'Courier New', monospace; padding:10px; display:flex; gap:10px; }
   .line-numbers { text-align:right; user-select:none; color:#888; }
@@ -21,38 +19,6 @@
 </head>
 <body>
 
-<div class="toolbar" id="toolbar">
-  <button onclick="format('bold')"><b>B</b></button>
-  <button onclick="format('underline')"><u>U</u></button>
-  <select onchange="format('fontName', this.value)">
-    <option value="">Font</option>
-    <option value="Arial">Klasický</option>
-    <option value="Courier New">Linux Terminal</option>
-    <option value="monospace">Monospace</option>
-  </select>
-  <select onchange="format('fontSize', this.value)">
-    <option value="">Velikost textu</option>
-    <option value="1">10px</option>
-    <option value="2">13px</option>
-    <option value="3">16px</option>
-    <option value="4">18px</option>
-    <option value="5">24px</option>
-    <option value="6">32px</option>
-    <option value="7">48px</option>
-  </select>
-  <select onchange="format('foreColor', this.value)">
-    <option value="">Barva textu</option>
-    <option value="red">Červená</option>
-    <option value="blue">Modrá</option>
-    <option value="green">Zelená</option>
-    <option value="black">Černá</option>
-  </select>
-  <button onclick="format('insertUnorderedList')">• List</button>
-  <button onclick="format('insertOrderedList')">1. List</button>
-  <button onclick="insertCode()">Vložit kód</button>
-  <button onclick="insertDocButton()">Vložit tlačítko editoru</button>
-</div>
-
 <div id="editor" contenteditable="false"></div>
 
 <div class="modal" id="modal">
@@ -65,7 +31,6 @@
 
 <script>
 const editor = document.getElementById('editor');
-const toolbar = document.getElementById('toolbar');
 const modal = document.getElementById('modal');
 const modalEditor = document.getElementById('modal-editor');
 const modalTitle = document.getElementById('modal-title');
@@ -77,13 +42,6 @@ window.onload = () => {
   const saved = localStorage.getItem('mainContent');
   if(saved) editor.innerHTML = saved;
 };
-
-// Formátování
-function format(command, value = null) {
-  if(!editor.isContentEditable) return;
-  document.execCommand(command, false, value);
-  saveText();
-}
 
 // Automatické ukládání
 editor.addEventListener('input', () => {
@@ -114,7 +72,6 @@ function saveText() {
 // Tajný edit mode
 window.editmode = () => {
   editor.setAttribute('contenteditable', 'true');
-  toolbar.style.display = 'flex';
 };
 
 // Klávesová zkratka Ctrl+E na zapnutí edit mode
@@ -163,18 +120,15 @@ function openModalEditor(id, name) {
   modal.style.display = 'flex';
   modalTitle.textContent = name;
 
-  // Načti obsah
   const saved = localStorage.getItem(id);
   modalEditor.innerHTML = saved ? saved : "";
 
-  // Blokovat editaci pokud hlavní editor není odemčen
   modalEditor.contentEditable = editor.isContentEditable ? "true" : "false";
 
   modalEditor.oninput = () => {
     if(currentDocId && editor.isContentEditable) {
       localStorage.setItem(currentDocId, modalEditor.innerHTML);
     } else {
-      // Obnov obsah, aby uživatel nemohl nic psát
       const saved = localStorage.getItem(currentDocId);
       modalEditor.innerHTML = saved ? saved : "";
     }
@@ -200,7 +154,7 @@ function openModalEditor(id, name) {
 function closeModal() {
   if(currentDocId && editor.isContentEditable) {
     localStorage.setItem(currentDocId, modalEditor.innerHTML);
-    saveText(); // uložit hlavní editor při zavření modálu
+    saveText();
   }
   modal.style.display = 'none';
   currentDocId = null;
